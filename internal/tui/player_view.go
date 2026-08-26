@@ -56,8 +56,7 @@ func (m *appModel) renderPlayerView() string {
 	var b strings.Builder
 	p := m.player
 
-	// 顶部信息行
-	title := truncate(p.mediaTitle, width-40)
+	// 顶部信息行（不展示标题，只展示播放进度/速度/音量/状态）
 	pos := 0.0
 	dur := 0.0
 	speed := 1.0
@@ -70,8 +69,8 @@ func (m *appModel) renderPlayerView() string {
 		vol = p.player.Volume()
 		paused = p.player.IsPaused()
 	}
-	header := fmt.Sprintf("♪ %s   %s / %s   %.2fx   %d%%",
-		title, fmtTime(pos), fmtTime(dur), speed, int(vol*100))
+	header := fmt.Sprintf("%s / %s   %.2fx   %d%%",
+		fmtTime(pos), fmtTime(dur), speed, int(vol*100))
 	if paused {
 		header += "  ⏸"
 	} else {

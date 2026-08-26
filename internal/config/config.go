@@ -21,6 +21,11 @@ func defaultConfigPath() string {
 	return filepath.Join(os.Getenv("HOME"), ".config", "eudic-tui", "config.toml")
 }
 
+// defaultCacheDir 默认缓存目录：~/.cache/eudic
+func defaultCacheDir() string {
+	return filepath.Join(os.Getenv("HOME"), ".cache", "eudic")
+}
+
 // Load 加载 config.toml
 //
 // 行为：
@@ -43,7 +48,7 @@ func Load(configPath string) (cfg *models.AppConfig, needsLogin bool, err error)
 
 	c := &models.AppConfig{
 		ChannelID:     "16287bc6-3ac0-4a9b-b06b-bc0224f2acb1",
-		CacheDir:      "./cache",
+		CacheDir:      defaultCacheDir(),
 		DefaultSpeed:  1.0,
 		DefaultVolume: 80,
 	}
@@ -57,7 +62,7 @@ func Load(configPath string) (cfg *models.AppConfig, needsLogin bool, err error)
 		return nil, false, fmt.Errorf("解析 config.toml 失败: %w", decErr)
 	}
 	if c.CacheDir == "" {
-		c.CacheDir = "./cache"
+		c.CacheDir = defaultCacheDir()
 	}
 	if c.ChannelID == "" {
 		c.ChannelID = "16287bc6-3ac0-4a9b-b06b-bc0224f2acb1"

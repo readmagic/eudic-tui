@@ -13,7 +13,8 @@ aspnet_session = ""
 channel_id = "16287bc6-3ac0-4a9b-b06b-bc0224f2acb1"
 
 # 缓存目录（音频文件本地存放路径）
-cache_dir = "./cache"
+# 留空则使用默认值：~/.cache/eudic
+cache_dir = ""
 
 # 默认播放速度（1.0 = 原速）
 default_speed = 1.0
