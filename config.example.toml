@@ -1,0 +1,22 @@
+# Eudic 听力 TUI 配置文件
+# 拷贝此文件为 config.toml 后填写你的 cookies
+
+# 欧路词典登录 session（从浏览器开发者工具复制）
+# 必填：EudicWebSession 的值（去掉 "EudicWebSession=" 前缀）
+eudic_session = ""
+
+# .AspNetCore.Session 的值（可选，但建议填上以保证列表接口稳定）
+aspnet_session = ""
+
+# 频道 ID（听力材料的频道，从列表页 URL 取）
+# 默认是用户已上传的频道
+channel_id = "16287bc6-3ac0-4a9b-b06b-bc0224f2acb1"
+
+# 缓存目录（音频文件本地存放路径）
+cache_dir = "./cache"
+
+# 默认播放速度（1.0 = 原速）
+default_speed = 1.0
+
+# 默认音量（0-100）
+default_volume = 80

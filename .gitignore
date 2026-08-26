@@ -1,0 +1,21 @@
+# 二进制和缓存
+bin/
+cache/
+*.mp3
+*.m4a
+*.db
+
+# 用户本地配置（含 cookies，不要推送）
+config.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Work Mate 工作目录
+.workmate/
