@@ -14,9 +14,17 @@ import (
 type appState int
 
 const (
-	stateList appState = iota
+	stateMenu appState = iota
+	stateList
 	statePlayer
+	stateVocab
 )
+
+// menuModel 主菜单视图状态
+type menuModel struct {
+	cursor int
+	// entries 固定两项：听力练习、背单词
+}
 
 // appModel 主模型
 type appModel struct {
@@ -26,12 +34,12 @@ type appModel struct {
 	progress *cache.ProgressStore
 	cfg      *models.AppConfig
 
-	list       listModel
-	player     playerModel
+	menu        menuModel
+	list        listModel
+	player      playerModel
 	lastSavedPos float64
 
 	width, height int
-	quit          bool
 }
 
 // tickMsg 定时刷新（驱动进度条与句子高亮）
@@ -40,19 +48,19 @@ type tickMsg struct{}
 // NewApp 创建主模型
 func NewApp(cfg *models.AppConfig, c *client.EudicClient, ch *cache.AudioCache, ps *cache.ProgressStore) *appModel {
 	return &appModel{
-		state:    stateList,
+		state:    stateMenu,
 		client:   c,
 		cache:    ch,
 		progress: ps,
 		cfg:      cfg,
+		menu:     menuModel{},
 		list:     listModel{page: 0},
-		player:   playerModel{showTranslation: true},
 	}
 }
 
 // Init 初始化命令
 func (m *appModel) Init() tea.Cmd {
-	return loadListCmd(m.client, m.list.page)
+	return nil
 }
 
 // loadListCmd 异步加载列表
@@ -101,10 +109,14 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 	case tea.KeyMsg:
 		switch m.state {
+		case stateMenu:
+			cmds = append(cmds, m.handleMenuKey(msg)...)
 		case stateList:
 			cmds = append(cmds, m.handleListKey(msg)...)
 		case statePlayer:
 			cmds = append(cmds, m.handlePlayerKey(msg)...)
+		case stateVocab:
+			cmds = append(cmds, m.handleVocabKey(msg)...)
 		}
 	case listLoadedMsg:
 		m.list.loading = false
@@ -182,11 +194,13 @@ func (m *appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // lastSavedPos 用于进度保存去抖（字段在 appModel 中）
 
-// handleListKey 处理列表按键
+// handleListKey 处理列表按键（vim 风格）
 func (m *appModel) handleListKey(msg tea.KeyMsg) []tea.Cmd {
 	switch msg.String() {
 	case "q", "ctrl+c":
-		m.quit = true
+		return []tea.Cmd{tea.Quit}
+	case "esc":
+		m.state = stateMenu
 		return nil
 	case "r":
 		m.list.loading = true
@@ -194,24 +208,36 @@ func (m *appModel) handleListKey(msg tea.KeyMsg) []tea.Cmd {
 		m.list.page = 0
 		m.list.items = nil
 		return []tea.Cmd{loadListCmd(m.client, 0)}
-	case "up", "k":
-		if m.list.cursor > 0 {
-			m.list.cursor--
-			if m.list.cursor < m.list.offset {
-				m.list.offset = m.list.cursor
-			}
-		}
-	case "down", "j":
+	case "j":
 		if m.list.cursor < len(m.list.items)-1 {
 			m.list.cursor++
-			winH := m.height - 10
-			if winH < 1 {
-				winH = 14
-			}
-			if m.list.cursor >= m.list.offset+winH {
-				m.list.offset++
-			}
 		}
+		m.ensureListVisible()
+	case "k":
+		if m.list.cursor > 0 {
+			m.list.cursor--
+		}
+		m.ensureListVisible()
+	case "g":
+		m.list.cursor = 0
+		m.list.offset = 0
+	case "G":
+		if len(m.list.items) > 0 {
+			m.list.cursor = len(m.list.items) - 1
+		}
+		m.ensureListVisible()
+	case "ctrl+d":
+		m.list.cursor += m.listHalfPage()
+		if m.list.cursor >= len(m.list.items) {
+			m.list.cursor = len(m.list.items) - 1
+		}
+		m.ensureListVisible()
+	case "ctrl+u":
+		m.list.cursor -= m.listHalfPage()
+		if m.list.cursor < 0 {
+			m.list.cursor = 0
+		}
+		m.ensureListVisible()
 	case "enter":
 		if len(m.list.items) == 0 {
 			return nil
@@ -219,25 +245,61 @@ func (m *appModel) handleListKey(msg tea.KeyMsg) []tea.Cmd {
 		item := m.list.items[m.list.cursor]
 		m.state = statePlayer
 		m.player = playerModel{
-			mediaID:         item.MediaID,
-			mediaTitle:      item.Title,
-			showTranslation: true,
-			loading:         true,
+			mediaID:    item.MediaID,
+			mediaTitle: item.Title,
+			loading:    true,
 		}
 		return []tea.Cmd{loadDetailCmd(m.client, m.cache, item)}
 	}
 	return nil
 }
 
-// handlePlayerKey 处理播放器按键
+// listWinHeight 列表可视行数
+func (m *appModel) listWinHeight() int {
+	winH := m.height - 10
+	if winH < 1 {
+		winH = 14
+	}
+	return winH
+}
+
+// listHalfPage 翻半屏的行数（至少 1）
+func (m *appModel) listHalfPage() int {
+	h := m.listWinHeight() / 2
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// ensureListVisible 让 cursor 保持在可视区域内
+func (m *appModel) ensureListVisible() {
+	if m.list.cursor < 0 {
+		m.list.cursor = 0
+	}
+	if max := len(m.list.items) - 1; m.list.cursor > max && max >= 0 {
+		m.list.cursor = max
+	}
+	winH := m.listWinHeight()
+	if m.list.cursor < m.list.offset {
+		m.list.offset = m.list.cursor
+	} else if m.list.cursor >= m.list.offset+winH {
+		m.list.offset = m.list.cursor - winH + 1
+		if m.list.offset < 0 {
+			m.list.offset = 0
+		}
+	}
+}
+
+// handlePlayerKey 处理播放器按键（vim 风格）
 func (m *appModel) handlePlayerKey(msg tea.KeyMsg) []tea.Cmd {
 	p := m.player.player
 	if p == nil {
-		// 音频还没就绪，只处理 L/q/Esc
+		// 音频还没就绪，只处理 Esc/q
 		switch msg.String() {
 		case "q", "ctrl+c":
-			m.quit = true
-		case "l", "esc":
+			return []tea.Cmd{tea.Quit}
+		case "esc", "backspace":
 			m.state = stateList
 		}
 		return nil
@@ -248,8 +310,9 @@ func (m *appModel) handlePlayerKey(msg tea.KeyMsg) []tea.Cmd {
 			_ = m.progress.Save(m.player.mediaID, p.Position())
 		}
 		p.Close()
-		m.quit = true
-	case "l", "esc":
+		m.player.player = nil
+		return []tea.Cmd{tea.Quit}
+	case "esc", "backspace":
 		if m.progress != nil {
 			_ = m.progress.Save(m.player.mediaID, p.Position())
 		}
@@ -258,38 +321,36 @@ func (m *appModel) handlePlayerKey(msg tea.KeyMsg) []tea.Cmd {
 		m.state = stateList
 	case " ": // space
 		p.Toggle()
-	case "left":
+	case "h":
 		_ = p.Seek(p.Position() - 5)
-	case "right":
+	case "l":
 		_ = p.Seek(p.Position() + 5)
+	case "j":
+		// 下一句
+		if m.player.detail != nil && m.player.currentSentence < len(m.player.detail.Sentences)-1 {
+			next := m.player.detail.Sentences[m.player.currentSentence+1]
+			_ = p.Seek(next.Start)
+		}
+	case "k":
+		// 上一句
+		if m.player.detail != nil && m.player.currentSentence > 0 {
+			prev := m.player.detail.Sentences[m.player.currentSentence-1]
+			_ = p.Seek(prev.Start)
+		}
+	case "+", "=":
+		p.SetVolume(p.Volume() + 0.05)
+	case "-":
+		p.SetVolume(p.Volume() - 0.05)
 	case "[":
 		p.SetSpeed(p.Speed() - 0.25)
 	case "]":
 		p.SetSpeed(p.Speed() + 0.25)
-	case "up":
-		p.SetVolume(p.Volume() + 0.05)
-	case "down":
-		p.SetVolume(p.Volume() - 0.05)
 	case ".":
 		if p.HasLoop() {
 			p.ClearLoop()
 		} else if m.player.detail != nil && m.player.currentSentence < len(m.player.detail.Sentences) {
 			s := m.player.detail.Sentences[m.player.currentSentence]
 			p.SetLoop(s.Start, s.End)
-		}
-	case "t":
-		m.player.showTranslation = !m.player.showTranslation
-	case "n":
-		// 下一句
-		if m.player.detail != nil && m.player.currentSentence < len(m.player.detail.Sentences)-1 {
-			next := m.player.detail.Sentences[m.player.currentSentence+1]
-			_ = p.Seek(next.Start)
-		}
-	case "p":
-		// 上一句
-		if m.player.detail != nil && m.player.currentSentence > 0 {
-			prev := m.player.detail.Sentences[m.player.currentSentence-1]
-			_ = p.Seek(prev.Start)
 		}
 	}
 	return nil
@@ -298,8 +359,12 @@ func (m *appModel) handlePlayerKey(msg tea.KeyMsg) []tea.Cmd {
 // View 主渲染
 func (m *appModel) View() string {
 	switch m.state {
+	case stateMenu:
+		return m.renderMenuView()
 	case statePlayer:
 		return m.renderPlayerView()
+	case stateVocab:
+		return m.renderVocabView()
 	default:
 		return m.renderListView()
 	}

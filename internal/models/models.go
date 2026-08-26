@@ -35,4 +35,7 @@ type AppConfig struct {
 	CacheDir      string `toml:"cache_dir"`
 	DefaultSpeed  float64 `toml:"default_speed"`
 	DefaultVolume int    `toml:"default_volume"`
+
+	// ConfigPath 当前配置文件路径（不写入 toml，仅运行时记录便于 Save）
+	ConfigPath string `toml:"-"`
 }

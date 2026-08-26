@@ -38,7 +38,7 @@ func (m *appModel) renderListView() string {
 	}
 
 	var b strings.Builder
-	title := theme.TitleStyle.Render("🎧 Eudic 听力练习")
+	title := theme.TitleStyle.Render("🎧 听力列表")
 	b.WriteString(title)
 	b.WriteString("\n\n")
 
@@ -55,14 +55,13 @@ func (m *appModel) renderListView() string {
 		b.WriteString("\n")
 	}
 
-	// 表头
-	header := fmt.Sprintf("%-3s %-50s %-20s %-10s", "#", "标题", "时间", "状态")
-	b.WriteString(theme.NormalStyle.Render(header))
+	// 表头：只保留序号和标题
+	b.WriteString(theme.NormalStyle.Render(fmt.Sprintf("%-4s %s", "#", "标题")))
 	b.WriteString("\n")
 	b.WriteString(strings.Repeat("─", width-2))
 	b.WriteString("\n")
 
-	// 列表项
+	// 列表项：cursor(2) + 序号(4) + 空格(1) + 标题(剩余)
 	start := m.list.offset
 	winHeight := height - 10
 	if winHeight < 1 {
@@ -72,15 +71,17 @@ func (m *appModel) renderListView() string {
 	if end > len(m.list.items) {
 		end = len(m.list.items)
 	}
+	titleMaxWidth := width - 2 - 4 - 1
+	if titleMaxWidth < 10 {
+		titleMaxWidth = 10
+	}
 	for i := start; i < end; i++ {
 		item := m.list.items[i]
 		cursor := "  "
 		if i == m.list.cursor {
 			cursor = "▶ "
 		}
-		title := truncate(item.Title, width-50)
-		line := fmt.Sprintf("%s%-2d %-50s %-20s %-10s",
-			cursor, i+1, title, item.FileTime, item.Status)
+		line := fmt.Sprintf("%s%-3d %s", cursor, i+1, truncate(item.Title, titleMaxWidth))
 		if i == m.list.cursor {
 			b.WriteString(theme.ActiveStyle.Render(line))
 		} else {
@@ -91,7 +92,7 @@ func (m *appModel) renderListView() string {
 
 	// 底部状态/帮助
 	b.WriteString("\n")
-	help := "[Enter] 播放  [↑/↓] 选择  [r] 刷新  [q] 退出"
+	help := "[Enter] 播放  [j/k] 选择  [g/G] 顶/底  [Ctrl-d/u] 翻半屏  [r] 刷新  [Esc] 主菜单  [q] 退出"
 	if len(m.list.items) > 0 {
 		help = fmt.Sprintf("[%d/%d]  ", m.list.cursor+1, len(m.list.items)) + help
 	}

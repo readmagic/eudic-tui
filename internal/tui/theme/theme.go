@@ -38,6 +38,8 @@ var (
 
 	TranslationStyle = lipgloss.NewStyle().Foreground(Accent)
 
+	WarningStyle = lipgloss.NewStyle().Foreground(Warning).Bold(true)
+
 	Border = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(Primary)

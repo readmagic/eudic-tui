@@ -17,7 +17,6 @@ type playerModel struct {
 	mediaID         string
 	mediaTitle      string
 	currentSentence int
-	showTranslation bool
 	loading         bool
 	err             string
 	offset          int // 句子视图滚动偏移
@@ -111,9 +110,6 @@ func (m *appModel) renderPlayerView() string {
 	if p.detail != nil && len(p.detail.Sentences) > 0 {
 		sentences := p.detail.Sentences
 		sentWinHeight := height - 14
-		if p.showTranslation {
-			sentWinHeight -= 4
-		}
 		if sentWinHeight < 3 {
 			sentWinHeight = 3
 		}
@@ -149,19 +145,9 @@ func (m *appModel) renderPlayerView() string {
 		}
 	}
 
-	// 译文区
-	if p.showTranslation && p.detail != nil && len(p.detail.Sentences) > p.currentSentence {
-		cur := p.detail.Sentences[p.currentSentence]
-		if cur.Translation != "" {
-			b.WriteString("\n")
-			b.WriteString(theme.TranslationStyle.Render("译文：" + cur.Translation))
-			b.WriteString("\n")
-		}
-	}
-
 	// 帮助
 	b.WriteString("\n")
-	help := "[Space] 播放/暂停  [←/→] ±5s  [//] ±0.25x  [↑/↓] 音量  [.] 单句循环  [t] 译文  [L] 列表  [q] 退出"
+	help := "[Space] 播放/暂停  [h/l] ±5s  [j/k] 上下句  [+/-] 音量  [//] ±0.25x  [.] 单句循环  [Esc] 列表  [q] 退出"
 	b.WriteString(theme.HelpStyle.Render(help))
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(b.String())

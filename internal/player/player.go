@@ -119,7 +119,20 @@ func (p *Player) Seek(sec float64) error {
 	if sample > p.src.Len() {
 		sample = p.src.Len()
 	}
-	return p.src.Seek(sample)
+	if !p.running {
+		return p.src.Seek(sample)
+	}
+	// 锁住 speaker，避免 oto 驱动 goroutine 在 seek 期间并发读取解码器导致状态错乱。
+	speaker.Lock()
+	defer speaker.Unlock()
+	if err := p.src.Seek(sample); err != nil {
+		return err
+	}
+	// Resampler 无 Seek 方法，内部 buf/pos/off 仍停在旧位置，会输出旧样本甚至误判 EOF。
+	// 保留当前 ratio 重建 resampler，并重连到 vol，让下一次 Stream 从新位置干净起步。
+	p.resamp = beep.ResampleRatio(3, p.resamp.Ratio(), p.src)
+	p.vol.Streamer = p.resamp
+	return nil
 }
 
 // Position 返回当前播放位置（秒，音频时间）
